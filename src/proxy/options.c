@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/system_properties.h>
 
 #include <event2/util.h>
 
@@ -391,6 +392,14 @@ options_apply(ProxyContext * const proxy_context)
 }
 
 int
+android_property_get(const char *key, char *value, const char *default_value)
+{
+    int i = __system_property_get(key, value);
+    if (!i) strcpy(value, default_value);
+    return i;
+}
+
+int
 options_parse(AppContext * const app_context,
               ProxyContext * const proxy_context, int argc, char *argv[])
 {
@@ -401,6 +410,17 @@ options_parse(AppContext * const app_context,
 #endif
 
     options_init_with_default(app_context, proxy_context);
+
+    // Get the dns resolver from the property
+    char value[PROP_VALUE_MAX] = {0};
+    android_property_get("net.dnscrypt_resolver", value, "opendns");
+
+    // Set to struct member
+    char *valp = malloc(PROP_VALUE_MAX);
+    strcpy(valp, value);
+    proxy_context->resolver_name = malloc(sizeof(char) * 32); // max of 32 chars
+    strcpy(proxy_context->resolver_name, valp);
+
     while ((opt_flag = getopt_long(argc, argv,
                                    getopt_options, getopt_long_options,
                                    &option_index)) != -1) {
